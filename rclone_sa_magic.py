@@ -40,7 +40,7 @@ CNT_SA_EXIT = 3  # if continually switch account for 3 times stop script
 # If TPSLIMITxTRANSFERS is too big, will cause 404 user rate limit error,
 # especially for tasks with a lot of small files
 TPSLIMIT = 3
-TRANSFERS = 3
+TRANSFERS = 4
 # =================modify here=================
 
 
@@ -301,7 +301,7 @@ def main():
         if args.dry_run:
             rclone_cmd += "--dry-run "
         # --fast-list is default adopted in the latest rclone
-        rclone_cmd += "--drive-server-side-across-configs --rc --rc-addr=\"localhost:{}\" -vv --ignore-existing ".format(args.port)
+        rclone_cmd += "--drive-server-side-across-configs --rc --rc-addr=\"localhost:{}\" -vv ".format(args.port)
         rclone_cmd += "--tpslimit {} --transfers {} --drive-chunk-size 32M ".format(TPSLIMIT, TRANSFERS)
         if args.disable_list_r:
             rclone_cmd += "--disable ListR "
@@ -379,15 +379,17 @@ def main():
             checks_done = int(response_processed_json['checks'])
             size_GB_done = int(size_bytes_done * 9.31322e-10)
             speed_now = float(int(response_processed_json['speed']) * 9.31322e-10 * 1024)
+            errors_now = int(response_processed_json['errors'])
+            transfered = int(response_processed_json['transfers'])
 
             # try:
             #     print(json.loads(response.decode('utf-8')))
             # except:
             #     print("have some encoding problem to print info")
             if already_start:
-                print("%s %dGB Done @ %fMB/s | checks: %d files" % (dst_label, size_GB_done, speed_now, checks_done), end="\r")
+                print("%s %dGB Done @ %fMB/s | transfered: %d files | checks: %d files | errors: %d" % (dst_label, size_GB_done, speed_now, transfered, checks_done, errors_now), end="\r")
             else:
-                print("%s reading source/destination | checks: %d files" % (dst_label, checks_done), end="\r")
+                print("%s reading source/destination | checks: %d files | errors: %d" % (dst_label, checks_done, errors_now), end="\r")
 
             # continually no ...
             if size_bytes_done - size_bytes_done_before == 0:
