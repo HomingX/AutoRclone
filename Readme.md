@@ -6,6 +6,9 @@ Many thanks for [rclone](https://rclone.org/) and [folderclone](https://github.c
 - [x] add massive service accounts into groups for your organization
 - [x] automatically switch accounts when rclone copy/move/sync 
 - [x] Windows system is supported
+- [x] 删除--ignore-existing参数
+- [x] 增加传输文件和checked文件判断，防止误kill导致丢文件
+- [x] 增加retryError判断
 
 Step 1. Copy code to your VPS or local machine
 ---------------------------------

@@ -33,6 +33,7 @@ PID = 0
 # parameters for this script
 SIZE_GB_MAX = 735  # if one account has already copied 735GB, switch to next account
 CNT_DEAD_RETRY = 100  # if there is no files be copied for 100 times, switch to next account
+CNT_ERROR_RETRY = 15  # if there is errors appears more than 15 times, switch to next account
 CNT_SA_EXIT = 3  # if continually switch account for 3 times stop script
 
 # change it when u know what are u doing
@@ -325,6 +326,7 @@ def main():
 
         cnt_error = 0
         cnt_dead_retry = 0
+        cnt_error_retry = 0
         size_bytes_done_before = 0
         cnt_acc_sucess = 0
         already_start = False
@@ -379,35 +381,45 @@ def main():
             checks_done = int(response_processed_json['checks'])
             size_GB_done = int(size_bytes_done * 9.31322e-10)
             speed_now = float(int(response_processed_json['speed']) * 9.31322e-10 * 1024)
-            errors_now = int(response_processed_json['errors'])
             transfered = int(response_processed_json['transfers'])
+            retry_error = bool(response_processed_json['retryError'])
+            if retry_error == True:
+                last_error = str(response_processed_json['lastError'])
 
             # try:
             #     print(json.loads(response.decode('utf-8')))
             # except:
             #     print("have some encoding problem to print info")
             if already_start:
-                print("%s %dGB Done @ %fMB/s | transfered: %d files | checks: %d files | errors: %d" % (dst_label, size_GB_done, speed_now, transfered, checks_done, errors_now), end="\r")
+                print("%s %dGB Done @ %fMB/s | transfered: %d files | checks: %d files" % (dst_label, size_GB_done, speed_now, transfered, checks_done), end="\r")
             else:
-                print("%s reading source/destination | checks: %d files | errors: %d" % (dst_label, checks_done, errors_now), end="\r")
+                if retry_error == True:
+                    print("%s reading source/destination | checks: %d files | error: %s" % (dst_label, checks_done, last_error), end="\r")
+                print("%s reading source/destination | checks: %d files" % (dst_label, checks_done), end="\r")
 
             # continually no ...
-            if size_bytes_done - size_bytes_done_before == 0:
+            if size_bytes_done - size_bytes_done_before == 0 or retry_error == True:
                 if already_start:
                     cnt_dead_retry += 1
                     if args.test_only:
                         print('\nsize_bytes_done', size_bytes_done)
                         print('size_bytes_done_before', size_bytes_done_before)
                         print("No. No size increase after job started.")
+                elif retry_error:
+                    cnt_error_retry += 1
+                    if args.test_only:
+                        print("%s" % (last_error), end="\r")
+
             else:
                 cnt_dead_retry = 0
+                cnt_error_retry = 0
                 if args.test_only: print("\nOk. I think the job has started")
                 already_start = True
 
             size_bytes_done_before = size_bytes_done
 
             # Stop by error (403, etc) info
-            if size_GB_done >= SIZE_GB_MAX or cnt_dead_retry >= CNT_DEAD_RETRY:
+            if size_GB_done >= SIZE_GB_MAX or cnt_dead_retry >= CNT_DEAD_RETRY or cnt_error_retry >= CNT_ERROR_RETRY:
 
                 if is_windows():
                     # kill_cmd = 'taskkill /IM "rclone.exe" /F'
@@ -436,7 +448,7 @@ def main():
                     if args.test_only: print("1 time sucess. the cnt_exit is reset to {}\n".format(cnt_exit))
 
                 # Regard continually exit as *all done*.
-                if cnt_exit >= CNT_SA_EXIT:
+                if cnt_exit >= CNT_SA_EXIT and transfered == checks_done:
                     print_during(time_start)
                     # exit directly rather than switch to next account.
                     print('All Done.')
