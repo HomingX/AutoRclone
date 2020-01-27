@@ -70,7 +70,7 @@ def parse_args():
                                                  "to destination (publicly shared drive/Team Drive).")
     parser.add_argument('-s', '--source_id', type=str,
                         help='the id of source. Team Drive id or publicly shared folder id')
-    parser.add_argument('-d', '--destination_id', type=str, required=True,
+    parser.add_argument('-d', '--destination_id', type=str,
                         help='the id of destination. Team Drive id or publicly shared folder id')
 
     parser.add_argument('-sp', '--source_path', type=str, default="",
@@ -166,45 +166,48 @@ def gen_rclone_cfg(args):
                 pass
 
             # For destination
-            if len(args.destination_id) == 33:
-                folder_or_team_drive_dst = 'root_folder_id'
-            elif len(args.destination_id) == 19:
-                folder_or_team_drive_dst = 'team_drive'
+            if args.destination_id:
+                if len(args.destination_id) == 33:
+                    folder_or_team_drive_dst = 'root_folder_id'
+                elif len(args.destination_id) == 19:
+                    folder_or_team_drive_dst = 'team_drive'
+                else:
+                    sys.exit('Wrong length of team_drive_id or publicly shared root_folder_id')
+
+                try:
+                    fp.write('[{}{:03d}]\n'
+                            'type = drive\n'
+                            'scope = drive\n'
+                            'service_account_file = {}\n'
+                            '{} = {}\n\n'.format('dst', i + 1, filename, folder_or_team_drive_dst, args.destination_id))
+                except:
+                    sys.exit("failed to write {} to {}".format(args.destination_id, output_of_config_file))
+
+                # For crypt destination
+                if args.crypt:
+                    remote_name = '{}{:03d}'.format('dst', i + 1)
+                    try:
+                        fp.write('[{}_crypt]\n'
+                                'type = crypt\n'
+                                'remote = {}:\n'
+                                'filename_encryption = standard\n'
+                                'password = hfSJiSRFrgyeQ_xNyx-rwOpsN2P2ZHZV\n'
+                                'directory_name_encryption = true\n\n'.format(remote_name, remote_name))
+                    except:
+                        sys.exit("failed to write {} to {}".format(args.destination_id, output_of_config_file))
+
+                # For cache destination
+                if args.cache:
+                    remote_name = '{}{:03d}'.format('dst', i + 1)
+                    try:
+                        fp.write('[{}_cache]\n'
+                                'type = cache\n'
+                                'remote = {}:\n'
+                                'chunk_total_size = 1G\n\n'.format(remote_name, remote_name))
+                    except:
+                        sys.exit("failed to write {} to {}".format(args.destination_id, output_of_config_file))
             else:
-                sys.exit('Wrong length of team_drive_id or publicly shared root_folder_id')
-
-            try:
-                fp.write('[{}{:03d}]\n'
-                         'type = drive\n'
-                         'scope = drive\n'
-                         'service_account_file = {}\n'
-                         '{} = {}\n\n'.format('dst', i + 1, filename, folder_or_team_drive_dst, args.destination_id))
-            except:
-                sys.exit("failed to write {} to {}".format(args.destination_id, output_of_config_file))
-
-            # For crypt destination
-            if args.crypt:
-                remote_name = '{}{:03d}'.format('dst', i + 1)
-                try:
-                    fp.write('[{}_crypt]\n'
-                             'type = crypt\n'
-                             'remote = {}:\n'
-                             'filename_encryption = standard\n'
-                             'password = hfSJiSRFrgyeQ_xNyx-rwOpsN2P2ZHZV\n'
-                             'directory_name_encryption = true\n\n'.format(remote_name, remote_name))
-                except:
-                    sys.exit("failed to write {} to {}".format(args.destination_id, output_of_config_file))
-
-            # For cache destination
-            if args.cache:
-                remote_name = '{}{:03d}'.format('dst', i + 1)
-                try:
-                    fp.write('[{}_cache]\n'
-                             'type = cache\n'
-                             'remote = {}:\n'
-                             'chunk_total_size = 1G\n\n'.format(remote_name, remote_name))
-                except:
-                    sys.exit("failed to write {} to {}".format(args.destination_id, output_of_config_file))
+                pass
 
     return output_of_config_file, i
 
@@ -309,6 +312,7 @@ def main():
         rclone_cmd += "--drive-acknowledge-abuse --log-file={} \"{}\" \"{}\"".format(logfile, src_full_path,
                                                                                      dst_full_path)
 
+
         if not is_windows():
             rclone_cmd = rclone_cmd + " &"
         else:
@@ -319,7 +323,10 @@ def main():
 
         try:
             subprocess.check_call(rclone_cmd, shell=True)
-            print(">> Let us go {} {}".format(dst_label, time.strftime("%H:%M:%S")))
+            if dst_label is None:
+                print(">> Let us go {} {}".format(src_label, time.strftime("%H:%M:%S")))
+            else:
+                print(">> Let us go {} {}".format(dst_label, time.strftime("%H:%M:%S")))
             time.sleep(10)
         except subprocess.SubprocessError as error:
             return print("error: " + str(error))
@@ -448,7 +455,7 @@ def main():
                     if args.test_only: print("1 time sucess. the cnt_exit is reset to {}\n".format(cnt_exit))
 
                 # Regard continually exit as *all done*.
-                if cnt_exit >= CNT_SA_EXIT and transfered == checks_done:
+                if cnt_exit >= CNT_SA_EXIT and transfered == 0:
                     print_during(time_start)
                     # exit directly rather than switch to next account.
                     print('All Done.')
